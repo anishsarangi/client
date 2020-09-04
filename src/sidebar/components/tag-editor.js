@@ -17,9 +17,11 @@ let tagEditorIdCounter = 0;
 
 /**
  * @typedef TagEditorProps
- * @prop {(a: Object<'tags', string[]>) => any} onEditTags - Callback that saves the tag list.
- * @prop {string[]} tagList - The list of editable tags as strings.
- * @prop {Object} tags - Services
+ * @prop {(a: string) => boolean} onAddTag - Callback to add a tag to the annotation
+ * @prop {(a: string) => boolean} onRemoveTag - Callback to remove a tag from the annotation
+ * @prop {Object} tagInputRef - A reference for the `input` field
+ * @prop {string[]} tagList - The list of editable tags
+ * @prop {Object} tags - Injected service
  */
 
 /**
@@ -30,8 +32,13 @@ let tagEditorIdCounter = 0;
  *
  * @param {TagEditorProps} props
  */
-function TagEditor({ onEditTags, tags: tagsService, tagList }) {
-  const inputEl = useRef(/** @type {HTMLInputElement|null} */ (null));
+function TagEditor({
+  onAddTag,
+  onRemoveTag,
+  tagInputRef: inputEl,
+  tagList,
+  tags: tagsService,
+}) {
   const [suggestions, setSuggestions] = useState(/** @type {string[]} */ ([]));
   const [activeItem, setActiveItem] = useState(-1); // -1 is unselected
   const [suggestionsListOpen, setSuggestionsListOpen] = useState(false);
@@ -88,51 +95,20 @@ function TagEditor({ onEditTags, tags: tagsService, tagList }) {
   };
 
   /**
-   * Handle changes to this annotation's tags
-   *
-   * @param {string[]} tagList
-   */
-  const updateTags = tagList => {
-    // update suggested tags list via service
-    tagsService.store(tagList.map(tag => ({ text: tag })));
-    onEditTags({ tags: tagList });
-  };
-
-  /**
-   * Remove a tag from this annotation.
-   *
-   * @param {string} tag
-   */
-  const removeTag = tag => {
-    const newTagList = [...tagList]; // make a copy
-    const index = newTagList.indexOf(tag);
-    newTagList.splice(index, 1);
-    updateTags(newTagList);
-  };
-
-  /**
-   * Adds a tag to the annotation equal to the value of the input field
-   * and then clears out the suggestions list and the input field.
+   * Invokes callback to add tag. If the tag was added, close the suggestions
+   * list, clear the field content and maintain focus.
    *
    * @param {string} newTag
    */
   const addTag = newTag => {
-    const value = newTag.trim();
-    if (value.length === 0) {
-      // don't add an empty tag
-      return;
-    }
-    if (tagList.indexOf(value) >= 0) {
-      // don't add duplicate tag
-      return;
-    }
-    updateTags([...tagList, value]);
-    setSuggestionsListOpen(false);
-    setActiveItem(-1);
+    if (onAddTag(newTag)) {
+      setSuggestionsListOpen(false);
+      setActiveItem(-1);
 
-    const input = inputEl.current;
-    input.value = '';
-    input.focus();
+      const input = inputEl.current;
+      input.value = '';
+      input.focus();
+    }
   };
 
   /**
@@ -283,7 +259,7 @@ function TagEditor({ onEditTags, tags: tagsService, tagList }) {
       : '';
 
   return (
-    <section className="tag-editor">
+    <div className="tag-editor">
       <ul
         className="tag-editor__tags"
         aria-label="Suggested tags for annotation"
@@ -300,7 +276,7 @@ function TagEditor({ onEditTags, tags: tagsService, tagList }) {
               </span>
               <button
                 onClick={() => {
-                  removeTag(tag);
+                  onRemoveTag(tag);
                 }}
                 aria-label={`Remove Tag: ${tag}`}
                 title={`Remove Tag: ${tag}`}
@@ -348,12 +324,14 @@ function TagEditor({ onEditTags, tags: tagsService, tagList }) {
           activeItem={activeItem}
         />
       </span>
-    </section>
+    </div>
   );
 }
 
 TagEditor.propTypes = {
-  onEditTags: propTypes.func.isRequired,
+  onAddTag: propTypes.func.isRequired,
+  onRemoveTag: propTypes.func.isRequired,
+  tagInputRef: propTypes.object.isRequired,
   tagList: propTypes.array.isRequired,
   tags: propTypes.object.isRequired,
 };
